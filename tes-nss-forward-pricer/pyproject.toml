@@ -13,6 +13,9 @@ python = ">=3.11,<3.13"
 numpy = "^2.1"
 scipy = "^1.14"
 pandas = "^2.2"
+# Colombian public holidays, including the Ley Emiliani Monday shift. The data
+# changes with legislation, so this is deliberately not pinned to one minor.
+holidays = ">=0.57,<1.0"
 pyyaml = "^6.0"
 requests = "^2.32"
 sodapy = "^2.2"

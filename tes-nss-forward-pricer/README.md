@@ -79,7 +79,7 @@ makes a run reproducible without committing market data.
 | --- | --- | --- |
 | Banco de la Republica | SUAMECA internal REST (reverse-engineered) | TES zero-coupon curve at 1/5/10y, Nelson-Siegel parameters, bid-ask spreads |
 | Manual export | CSV/XLSX from a venue or vendor terminal | per-ISIN TES prices |
-| datos.gov.co | Socrata / SODA, via `sodapy` | public datasets by four-by-four id |
+| datos.gov.co | Socrata / SODA, via `sodapy` | TRM (USD/COP) daily, dataset `32sa-8pi3` |
 
 > **SUAMECA publishes no per-ISIN TES prices.** Banco de la Republica computes
 > its curve from the SEN and MEC tapes and publishes only the fit; the
@@ -91,6 +91,16 @@ makes a run reproducible without committing market data.
 > [docs/suameca_reverse_engineering.md](docs/suameca_reverse_engineering.md)
 > (investigated 2026-09-07; these are undocumented SPA internals and can change
 > without notice).
+
+> **datos.gov.co publishes no queryable IBR.** Its only IBR asset, `ev8i-uzwt`,
+> is an `assetType=href` link stub: no columns, no rows, and HTTP 403
+> `no row or column access to non-tabular tables` for any query.
+> `SocrataClient.fetch_ibr()` therefore raises, naming the SUAMECA series that do
+> carry the fixings (241 overnight nominal, 15324 overnight effective, and the
+> 1/3/6/12-month pairs), rather than returning an empty frame. Banco de la
+> Republica publishes every tenor **twice**, nominal ACT/360 and effective base
+> 365; the market fixing is the nominal one, so the OIS bootstrap must read
+> `frame.attrs["convention"]` and reconcile rather than assume.
 
 `SOCRATA_APP_TOKEN` is optional; it raises the rate limit rather than granting
 access. Copy `.env.example` to `.env` to configure.
