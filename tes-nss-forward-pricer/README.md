@@ -77,8 +77,20 @@ makes a run reproducible without committing market data.
 
 | Source | Endpoint | Contents |
 | --- | --- | --- |
-| Banco de la Republica | SUAMECA series service | TES zero-coupon reference curve, IBR overnight fixings, TRM |
+| Banco de la Republica | SUAMECA internal REST (reverse-engineered) | TES zero-coupon curve at 1/5/10y, Nelson-Siegel parameters, bid-ask spreads |
+| Manual export | CSV/XLSX from a venue or vendor terminal | per-ISIN TES prices |
 | datos.gov.co | Socrata / SODA, via `sodapy` | public datasets by four-by-four id |
+
+> **SUAMECA publishes no per-ISIN TES prices.** Banco de la Republica computes
+> its curve from the SEN and MEC tapes and publishes only the fit; the
+> underlying quotes are distributed commercially. `fetch_tes_prices()` is
+> therefore backed by a manual export and raises rather than returning an empty
+> frame when none is configured. It also fits **Nelson-Siegel (1987)**, not
+> Svensson, so its published betas are a cross-check, not calibration input.
+> Endpoints, payloads and failure modes:
+> [docs/suameca_reverse_engineering.md](docs/suameca_reverse_engineering.md)
+> (investigated 2026-09-07; these are undocumented SPA internals and can change
+> without notice).
 
 `SOCRATA_APP_TOKEN` is optional; it raises the rate limit rather than granting
 access. Copy `.env.example` to `.env` to configure.
