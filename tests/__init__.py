@@ -1,4 +1,4 @@
-"""Test suite for tes-nss-forward-pricer.
+"""Test suite for tes-curve-calibration.
 
 Three tiers, separated by marker so the default run stays offline and fast:
 

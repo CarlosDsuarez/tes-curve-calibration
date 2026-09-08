@@ -209,7 +209,7 @@ class SuamecaClient:
         self._session.headers.update(
             {
                 "Accept": "application/json",
-                "User-Agent": "tes-nss-forward-pricer/0.1 (+research; contact repo owner)",
+                "User-Agent": "tes-curve-calibration/0.1 (+research; contact repo owner)",
             }
         )
 

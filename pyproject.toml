@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "tes-nss-forward-pricer"
+name = "tes-curve-calibration"
 version = "0.1.0"
 description = "Nelson-Siegel-Svensson calibration on Colombian TES and USD/COP forward pricing under CIP."
 authors = ["Carlos Suarez <goyosuarez21062004@gmail.com>"]

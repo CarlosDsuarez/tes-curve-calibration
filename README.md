@@ -1,4 +1,4 @@
-# tes-nss-forward-pricer
+# TES Curve Calibration
 
 Nelson-Siegel-Svensson calibration on Colombian TES, COP OIS bootstrapping from
 IBR, and USD/COP forward pricing under covered interest parity.
