@@ -1,0 +1,20 @@
+{
+  "generated_at": "2026-09-07T00:00:00Z",
+  "data_sources": [
+    {
+      "name": "TES tasa cero cupon - curva de referencia",
+      "url": "https://suameca.banrep.gov.co/estadisticas-economicas/rest/consultaDatosService",
+      "endpoint_type": "SUAMECA",
+      "retrieved_at": "2026-09-07T00:00:00Z",
+      "file_path": "data/raw/suameca_tes_cero_cupon.json",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "row_count": 0,
+      "date_range": {
+        "start": "1900-01-01",
+        "end": "1900-01-01"
+      }
+    }
+  ],
+  "validation_status": "PENDING",
+  "schema_version": "1.0.0"
+}

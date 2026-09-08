@@ -1,0 +1,56 @@
+# ---------------------------------------------------------------------------
+# Benchmark TES tasa fija used as calibration instruments.
+#
+# STATUS: skeleton. The `bonds` list is populated in Phase 2 from the official
+# issuance terms; the two entries below are structural examples and their ISINs,
+# coupons and maturities are NOT verified market data. Do not calibrate against
+# this file until the list has been filled in and validated.
+#
+# Sources of record:
+#   - Ministerio de Hacienda / Direccion General de Credito Publico, issuance
+#     terms and reopening notices.
+#   - Banco de la Republica SUAMECA, published zero-coupon reference curve, used
+#     only as a cross-check on the in-house calibration.
+# ---------------------------------------------------------------------------
+schema_version: "1.0.0"
+
+conventions:
+  currency: COP
+  day_count: ACT/365
+  coupon_frequency: 1          # TES tasa fija pay annual coupons
+  business_day_convention: MODIFIED_FOLLOWING
+  settlement_lag_days: 3       # T+3 on SEN/MEC
+  face_value: 100.0
+  quote_type: clean_price      # per 100 of face
+
+calibration:
+  min_instruments: 6           # six free NSS parameters
+  min_maturity_years: 0.25     # drop the very short end, it is repo-driven
+  max_maturity_years: 30.0
+  exclude_stale_after_sessions: 3
+  weight_by_inverse_duration: true
+
+# Populated in Phase 2. Each entry must carry a verified ISIN and issuance terms.
+bonds: []
+
+# Structural example of the expected entry shape (values are placeholders):
+#
+# bonds:
+#   - isin: "COXXXXXXXXXX"
+#     nickname: "TES 2028"
+#     issue_date: "2018-01-01"
+#     maturity_date: "2028-01-01"
+#     coupon_rate: 0.0000        # decimal, not percent
+#     coupon_frequency: 1
+#     day_count: "ACT/365"
+#     benchmark: true
+#     notes: "verify against the DGCP issuance notice before use"
+
+# IBR OIS pillars for the COP discount curve, also to be completed in Phase 2.
+ois_pillars: []
+
+fx:
+  pair: USDCOP
+  quote_convention: COP_PER_USD
+  spot_settlement_lag_days: 2
+  standard_tenors: ["1M", "2M", "3M", "6M", "9M", "1Y"]
