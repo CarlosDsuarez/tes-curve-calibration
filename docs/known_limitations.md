@@ -190,3 +190,68 @@ newer than the `^2.2` / `^2.1` floors in `pyproject.toml`. Nothing in the
 benchmark path touches pandas, and the constraints are floors rather than pins,
 so this is recorded only so a later `pandas` 3 migration finding is not mistaken
 for a regression introduced here.
+
+---
+
+## 7. Short-end curve inputs: what is free, and what is genuinely not
+
+**Verified 2026-09-08 against the live SUAMECA endpoint.**
+
+`tes_pricer.math.ois_curve` was specified on the assumption that Banco de la
+República publishes only IBR **overnight** for free, and that 1M/3M would need a
+paid market-data subscription. **That assumption is wrong, and the module does
+not encode it.**
+
+IBR is published at overnight, 1M, 3M, 6M and 12M, in both nominal (base 360)
+and effective (base 365) form, on the same free, unauthenticated endpoint
+`tes_pricer.data.suameca_client` already uses:
+
+```text
+GET /estadisticas-economicas-back/rest/estadisticaEconomicaRestService
+    /consultaInformacionSerieXTipoDato?idSerie={id}&tipoDato=1
+```
+
+| Tenor | Effective (base 365) | Nominal (base 360) | Observations returned | History from |
+| --- | --- | --- | --- | --- |
+| Overnight | 15324 | 241 | 4555 | 2008-01-02 |
+| 1M | 15325 | 242 | 3436 | 2012-08-01 |
+| 3M | 15326 | 243 | 3436 | 2012-08-01 |
+| 6M | 16561 | 16560 | 2509 | 2016-05-23 |
+| 12M | 16563 | 16562 | 1031 | 2022-06-13 |
+
+The **effective** series are already on the ACT/365 E.A. basis
+`ShortRateCurve` expects, so they need no conversion. The `datos.gov.co`
+Socrata entry for IBR is *not* an alternative: `ev8i-uzwt` has
+`displayType: "href"`, i.e. it is a link out to Banco de la República, and the
+Socrata API answers any row query on it with
+`"no row or column access to non-tabular tables"`.
+
+Three real limitations remain:
+
+1. **COP par OIS swap quotes are not public.** Banco de la República publishes
+   the IBR *index* at these tenors, not the IBR *swap* curve. A full
+   arbitrage-free bootstrap past 12M therefore still needs a paid feed, which
+   is why `ois_bootstrap.bootstrap_ois_curve` stays a v2 item. Interpolating
+   the published fixings, as `ois_curve` does, is not the same object: index
+   fixings are not par swap rates, and beyond 12M there is nothing to
+   interpolate at all — only the flat extrapolation.
+
+2. **USD has no free forward-looking term structure.** The New York Fed
+   publishes overnight SOFR and the 30/90/180-day SOFR *Averages* at no cost,
+   but the Averages compound **in arrears** — they are realised backward-looking
+   averages, not forward-looking term rates, so they are not discount-curve
+   pillars and must not be passed off as such. The forward-looking CME Term
+   SOFR fixings are licensed and not freely redistributable.
+   `build_usd_short_curve` therefore defaults to a single overnight pillar and
+   warns; `additional_tenors` is the hook for a licensed feed.
+
+3. **A single-pillar curve has no term structure at all.** Where the flat
+   fallback is used, every tenor discounts at one rate and every implied
+   forward is flat by construction, so any carry or curve-trade number read off
+   it is an artefact. This is surfaced as a dedicated
+   `FlatCurveApproximationWarning` rather than a docstring note, and a caller
+   can make it fatal with
+   `warnings.simplefilter("error", FlatCurveApproximationWarning)`.
+
+For COP, limitation 3 should never be hit in normal operation: if the 1M and 3M
+pillars are missing, the fetch degraded — the data was there.
