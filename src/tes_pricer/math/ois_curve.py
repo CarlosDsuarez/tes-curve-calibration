@@ -220,6 +220,29 @@ class ShortRateCurve:
             )
         )
 
+    def interpolated_rate(self, tau: float) -> float:
+        """Alias of :meth:`rate`, named for callers that need the rate itself.
+
+        Same interpolation, same flat extrapolation, same value - the name
+        exists because the consumers outside this module ask for the
+        *interpolated rate* rather than for "the curve's rate", and reading
+        ``cop_curve.interpolated_rate(tau)`` next to
+        ``cop_curve.discount_factor(tau)`` makes it obvious that the rate is
+        the interpolated quantity and the discount factor is derived from it.
+        :func:`tes_pricer.math.fx_forward.price_fx_forward` needs the rate
+        directly, because covered interest parity is stated in rates.
+
+        Args:
+            tau: Year fraction from :attr:`curve_date`, non-negative.
+
+        Returns:
+            The effective annual rate as a decimal.
+
+        Raises:
+            ValueError: If ``tau`` is negative or not finite.
+        """
+        return self.rate(tau)
+
     def discount_factor(self, tau: float) -> float:
         r"""Return :math:`DF(\tau) = (1 + r(\tau))^{-\tau}` on the E.A. basis.
 

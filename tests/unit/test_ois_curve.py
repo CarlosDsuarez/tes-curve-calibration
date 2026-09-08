@@ -393,3 +393,18 @@ def test_lists_are_accepted_and_coerced_to_float_arrays() -> None:
     assert curve.tenors_years.dtype == np.float64
     assert curve.rates.dtype == np.float64
     assert curve.discount_factor(0.25) == pytest.approx(0.9764540896763105, abs=1e-12)
+
+
+def test_interpolated_rate_is_the_same_value_as_rate() -> None:
+    """The FX-facing alias must not drift away from the method it delegates to."""
+    curve = three_point_curve()
+    for tau in (0.0, 0.01, 0.125, 0.375, 0.5, 0.75, 5.0):
+        assert curve.interpolated_rate(tau) == curve.rate(tau)
+
+
+def test_discount_factor_is_derived_from_the_interpolated_rate() -> None:
+    """DF(tau) = (1 + interpolated_rate(tau))^-tau, the E.A. basis in one assertion."""
+    curve = three_point_curve()
+    tau = 0.375
+    expected = (1.0 + curve.interpolated_rate(tau)) ** (-tau)
+    assert curve.discount_factor(tau) == pytest.approx(expected, rel=1e-15)
