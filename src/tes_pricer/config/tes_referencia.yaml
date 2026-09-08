@@ -1,52 +1,386 @@
 # ---------------------------------------------------------------------------
-# Benchmark TES tasa fija used as calibration instruments.
+# Universo de TES Tasa Fija en pesos usado como instrumentos de calibracion NSS.
 #
-# STATUS: skeleton. The `bonds` list is populated in Phase 2 from the official
-# issuance terms; the two entries below are structural examples and their ISINs,
-# coupons and maturities are NOT verified market data. Do not calibrate against
-# this file until the list has been filled in and validated.
+# PROVENIENCIA. Las cifras de mercado de este archivo provienen de una unica
+# fuente primaria: el "Informe Diario de Deuda Publica" que publica la
+# Subdireccion de Financiamiento Interno de la Nacion (Direccion General de
+# Credito Publico y Tesoro Nacional, Ministerio de Hacienda y Credito Publico),
+# edicion del viernes 14 de agosto de 2026, tabla "Tasa Fija en Pesos".
+# Ese informe declara el saldo de emisiones vigentes con corte al 06-ago-2026.
 #
-# Sources of record:
-#   - Ministerio de Hacienda / Direccion General de Credito Publico, issuance
-#     terms and reopening notices.
-#   - Banco de la Republica SUAMECA, published zero-coupon reference curve, used
-#     only as a cross-check on the in-house calibration.
+# NIVEL DE VERIFICACION POR CAMPO. No todos los campos tienen el mismo respaldo.
+# Cada bono lleva `campos_no_verificados`, y el bloque `metadata.advertencias`
+# explica el origen de cada limitacion. Leerlo antes de calibrar.
+#
+#   Verificado con fuente primaria, por bono:
+#     nemotecnico, fecha_vencimiento, tasa_cupon_nominal, saldo_vigente_cop_mm,
+#     precio_limpio_ref, tasa_ref, duracion_ref, fuente_precio
+#   Verificado con fuente primaria, a nivel de mercado (aplica a todos):
+#     frecuencia_cupon (BanRep), day_count_convention (SFC CE 100/1995),
+#     valor_nominal (base de cotizacion, del propio informe diario)
+#   Derivado, NO citado en fuente primaria:
+#     fecha_emision (decodificada del nemotecnico), isin (no publicado por
+#     MinHacienda/BanRep en fuente abierta; se deja nulo)
 # ---------------------------------------------------------------------------
-schema_version: "1.0.0"
+schema_version: "2.0.0"
 
+bonos_benchmark:
+  # --- tramo corto -------------------------------------------------------
+  - isin: null
+    nemotecnico: "TFIT08031127"
+    nombre_corto: "TES 5.75% 2027"
+    fecha_emision: "2019-11-03"
+    fecha_vencimiento: "2027-11-03"
+    tasa_cupon_nominal: 0.0575
+    frecuencia_cupon: "anual"
+    valor_nominal: 100.0
+    day_count_convention: "ACT/365"
+    fuente_verificacion: "MinHacienda DGCPTN, Informe Diario de Deuda Publica, 14-ago-2026, tabla Tasa Fija en Pesos, fila 8 (https://www.irc.gov.co/documents/d/guest/informe-diario-14-de-agosto-de-2026)"
+    fecha_verificacion: "2026-09-07"
+    tramo_curva: "corto"
+    saldo_vigente_cop_mm: 22186857
+    precio_limpio_ref: 93.126
+    tasa_ref: 0.12080
+    duracion_ref: 1.16
+    fuente_precio: "SEN"
+    campos_no_verificados: ["isin", "fecha_emision"]
+
+  - isin: null
+    nemotecnico: "TFIT16280428"
+    nombre_corto: "TES 6.00% 2028"
+    fecha_emision: "2012-04-28"
+    fecha_vencimiento: "2028-04-28"
+    tasa_cupon_nominal: 0.0600
+    frecuencia_cupon: "anual"
+    valor_nominal: 100.0
+    day_count_convention: "ACT/365"
+    fuente_verificacion: "MinHacienda DGCPTN, Informe Diario de Deuda Publica, 14-ago-2026, tabla Tasa Fija en Pesos, fila 9 (https://www.irc.gov.co/documents/d/guest/informe-diario-14-de-agosto-de-2026)"
+    fecha_verificacion: "2026-09-07"
+    tramo_curva: "corto"
+    saldo_vigente_cop_mm: 38498600
+    precio_limpio_ref: 90.924
+    tasa_ref: 0.12165
+    duracion_ref: 1.64
+    fuente_precio: "SEN"
+    campos_no_verificados: ["isin", "fecha_emision"]
+
+  - isin: null
+    nemotecnico: "TFIT05220829"
+    nombre_corto: "TES 11.00% 2029"
+    fecha_emision: "2024-08-22"
+    fecha_vencimiento: "2029-08-22"
+    tasa_cupon_nominal: 0.1100
+    frecuencia_cupon: "anual"
+    valor_nominal: 100.0
+    day_count_convention: "ACT/365"
+    fuente_verificacion: "MinHacienda DGCPTN, Informe Diario de Deuda Publica, 14-ago-2026, tabla Tasa Fija en Pesos, fila 10 (https://www.irc.gov.co/documents/d/guest/informe-diario-14-de-agosto-de-2026)"
+    fecha_verificacion: "2026-09-07"
+    tramo_curva: "corto"
+    saldo_vigente_cop_mm: 43510813
+    precio_limpio_ref: 97.413
+    tasa_ref: 0.12066
+    duracion_ref: 2.46
+    fuente_precio: "SEN"
+    campos_no_verificados: ["isin", "fecha_emision"]
+
+  # --- tramo medio -------------------------------------------------------
+  - isin: null
+    nemotecnico: "TFIT05270230"
+    nombre_corto: "TES 12.50% 2030"
+    fecha_emision: "2025-02-27"
+    fecha_vencimiento: "2030-02-27"
+    tasa_cupon_nominal: 0.1250
+    frecuencia_cupon: "anual"
+    valor_nominal: 100.0
+    day_count_convention: "ACT/365"
+    fuente_verificacion: "MinHacienda DGCPTN, Informe Diario de Deuda Publica, 14-ago-2026, fila 11; cupon y vencimiento confirmados de forma independiente en el comunicado de subasta MinHacienda del 13-may-2026, Tabla 1 (referencia 4 anos, 27-feb-30, cupon 12,500%)"
+    fecha_verificacion: "2026-09-07"
+    tramo_curva: "medio"
+    saldo_vigente_cop_mm: 35520024
+    precio_limpio_ref: 100.866
+    tasa_ref: 0.12120
+    duracion_ref: 2.92
+    fuente_precio: "SEN"
+    campos_no_verificados: ["isin", "fecha_emision"]
+
+  - isin: null
+    nemotecnico: "TFIT16180930"
+    nombre_corto: "TES 7.75% 2030"
+    fecha_emision: "2014-09-18"
+    fecha_vencimiento: "2030-09-18"
+    tasa_cupon_nominal: 0.0775
+    frecuencia_cupon: "anual"
+    valor_nominal: 100.0
+    day_count_convention: "ACT/365"
+    fuente_verificacion: "MinHacienda DGCPTN, Informe Diario de Deuda Publica, 14-ago-2026, tabla Tasa Fija en Pesos, fila 12 (https://www.irc.gov.co/documents/d/guest/informe-diario-14-de-agosto-de-2026)"
+    fecha_verificacion: "2026-09-07"
+    tramo_curva: "medio"
+    saldo_vigente_cop_mm: 25333284
+    precio_limpio_ref: 86.528
+    tasa_ref: 0.12100
+    duracion_ref: 3.36
+    fuente_precio: "SEN"
+    campos_no_verificados: ["isin", "fecha_emision"]
+
+  - isin: null
+    nemotecnico: "TFIT10260331"
+    nombre_corto: "TES 7.00% 2031"
+    fecha_emision: "2021-03-26"
+    fecha_vencimiento: "2031-03-26"
+    tasa_cupon_nominal: 0.0700
+    frecuencia_cupon: "anual"
+    valor_nominal: 100.0
+    day_count_convention: "ACT/365"
+    fuente_verificacion: "MinHacienda DGCPTN, Informe Diario de Deuda Publica, 14-ago-2026, tabla Tasa Fija en Pesos, fila 14 (https://www.irc.gov.co/documents/d/guest/informe-diario-14-de-agosto-de-2026)"
+    fecha_verificacion: "2026-09-07"
+    tramo_curva: "medio"
+    saldo_vigente_cop_mm: 30931545
+    precio_limpio_ref: 82.762
+    tasa_ref: 0.12059
+    duracion_ref: 3.93
+    fuente_precio: "SEN"
+    campos_no_verificados: ["isin", "fecha_emision"]
+
+  - isin: null
+    nemotecnico: "TFIT16300632"
+    nombre_corto: "TES 7.00% 2032"
+    fecha_emision: "2016-06-30"
+    fecha_vencimiento: "2032-06-30"
+    tasa_cupon_nominal: 0.0700
+    frecuencia_cupon: "anual"
+    valor_nominal: 100.0
+    day_count_convention: "ACT/365"
+    fuente_verificacion: "MinHacienda DGCPTN, Informe Diario de Deuda Publica, 14-ago-2026, tabla Tasa Fija en Pesos, fila 15 (https://www.irc.gov.co/documents/d/guest/informe-diario-14-de-agosto-de-2026)"
+    fecha_verificacion: "2026-09-07"
+    tramo_curva: "medio"
+    saldo_vigente_cop_mm: 27621627
+    precio_limpio_ref: 79.488
+    tasa_ref: 0.12060
+    duracion_ref: 4.85
+    fuente_precio: "SEN"
+    campos_no_verificados: ["isin", "fecha_emision"]
+
+  - isin: null
+    nemotecnico: "TFIT11090233"
+    nombre_corto: "TES 13.25% 2033"
+    fecha_emision: "2022-02-09"
+    fecha_vencimiento: "2033-02-09"
+    tasa_cupon_nominal: 0.1325
+    frecuencia_cupon: "anual"
+    valor_nominal: 100.0
+    day_count_convention: "ACT/365"
+    fuente_verificacion: "MinHacienda DGCPTN, Informe Diario de Deuda Publica, 14-ago-2026, tabla Tasa Fija en Pesos, fila 16 (https://www.irc.gov.co/documents/d/guest/informe-diario-14-de-agosto-de-2026)"
+    fecha_verificacion: "2026-09-07"
+    tramo_curva: "medio"
+    saldo_vigente_cop_mm: 50059829
+    precio_limpio_ref: 105.199
+    tasa_ref: 0.12008
+    duracion_ref: 4.52
+    fuente_precio: "SEN"
+    campos_no_verificados: ["isin", "fecha_emision"]
+
+  - isin: null
+    nemotecnico: "TFIT16181034"
+    nombre_corto: "TES 7.25% 2034"
+    fecha_emision: "2018-10-18"
+    fecha_vencimiento: "2034-10-18"
+    tasa_cupon_nominal: 0.0725
+    frecuencia_cupon: "anual"
+    valor_nominal: 100.0
+    day_count_convention: "ACT/365"
+    fuente_verificacion: "MinHacienda DGCPTN, Informe Diario de Deuda Publica, 14-ago-2026, tabla Tasa Fija en Pesos, fila 17 (https://www.irc.gov.co/documents/d/guest/informe-diario-14-de-agosto-de-2026)"
+    fecha_verificacion: "2026-09-07"
+    tramo_curva: "medio"
+    saldo_vigente_cop_mm: 15721623
+    precio_limpio_ref: 76.292
+    tasa_ref: 0.11936
+    duracion_ref: 5.73
+    fuente_precio: "SEN"
+    campos_no_verificados: ["isin", "fecha_emision"]
+
+  - isin: null
+    nemotecnico: "TFIT11240135"
+    nombre_corto: "TES 11.75% 2035"
+    fecha_emision: "2024-01-24"
+    fecha_vencimiento: "2035-01-24"
+    tasa_cupon_nominal: 0.1175
+    frecuencia_cupon: "anual"
+    valor_nominal: 100.0
+    day_count_convention: "ACT/365"
+    fuente_verificacion: "MinHacienda DGCPTN, Informe Diario de Deuda Publica, 14-ago-2026, fila 18; cupon y vencimiento confirmados de forma independiente en el comunicado de subasta MinHacienda del 13-may-2026, Tabla 1 (referencia 9 anos, 24-ene-35, cupon 11,750%)"
+    fecha_verificacion: "2026-09-07"
+    tramo_curva: "medio"
+    saldo_vigente_cop_mm: 46435219
+    precio_limpio_ref: 98.551
+    tasa_ref: 0.12000
+    duracion_ref: 5.44
+    fuente_precio: "SEN"
+    campos_no_verificados: ["isin", "fecha_emision"]
+
+  - isin: null
+    nemotecnico: "TFIT16090736"
+    nombre_corto: "TES 6.25% 2036"
+    fecha_emision: "2020-07-09"
+    fecha_vencimiento: "2036-07-09"
+    tasa_cupon_nominal: 0.0625
+    frecuencia_cupon: "anual"
+    valor_nominal: 100.0
+    day_count_convention: "ACT/365"
+    fuente_verificacion: "MinHacienda DGCPTN, Informe Diario de Deuda Publica, 14-ago-2026, tabla Tasa Fija en Pesos, fila 19 (https://www.irc.gov.co/documents/d/guest/informe-diario-14-de-agosto-de-2026)"
+    fecha_verificacion: "2026-09-07"
+    tramo_curva: "medio"
+    saldo_vigente_cop_mm: 15396255
+    precio_limpio_ref: 68.390
+    tasa_ref: 0.11830
+    duracion_ref: 7.09
+    fuente_precio: "SEN"
+    campos_no_verificados: ["isin", "fecha_emision"]
+
+  # --- tramo largo -------------------------------------------------------
+  - isin: null
+    nemotecnico: "TFIT16281140"
+    nombre_corto: "TES 12.75% 2040"
+    fecha_emision: "2024-11-28"
+    fecha_vencimiento: "2040-11-28"
+    tasa_cupon_nominal: 0.1275
+    frecuencia_cupon: "anual"
+    valor_nominal: 100.0
+    day_count_convention: "ACT/365"
+    fuente_verificacion: "MinHacienda DGCPTN, Informe Diario de Deuda Publica, 14-ago-2026, fila 20; cupon y vencimiento confirmados de forma independiente en el comunicado de subasta MinHacienda del 13-may-2026, Tabla 1 (referencia 14 anos, 28-nov-40, cupon 12,750%)"
+    fecha_verificacion: "2026-09-07"
+    tramo_curva: "largo"
+    saldo_vigente_cop_mm: 27200642
+    precio_limpio_ref: 104.640
+    tasa_ref: 0.12032
+    duracion_ref: 6.83
+    fuente_precio: "SEN"
+    campos_no_verificados: ["isin", "fecha_emision"]
+
+  - isin: null
+    nemotecnico: "TFIT21280542"
+    nombre_corto: "TES 9.25% 2042"
+    fecha_emision: "2021-05-28"
+    fecha_vencimiento: "2042-05-28"
+    tasa_cupon_nominal: 0.0925
+    frecuencia_cupon: "anual"
+    valor_nominal: 100.0
+    day_count_convention: "ACT/365"
+    fuente_verificacion: "MinHacienda DGCPTN, Informe Diario de Deuda Publica, 14-ago-2026, tabla Tasa Fija en Pesos, fila 21 (https://www.irc.gov.co/documents/d/guest/informe-diario-14-de-agosto-de-2026)"
+    fecha_verificacion: "2026-09-07"
+    tramo_curva: "largo"
+    saldo_vigente_cop_mm: 46998055
+    precio_limpio_ref: 81.079
+    tasa_ref: 0.11957
+    duracion_ref: 7.99
+    fuente_precio: "SEN"
+    campos_no_verificados: ["isin", "fecha_emision"]
+
+  - isin: null
+    nemotecnico: "TFIT23250746"
+    nombre_corto: "TES 11.50% 2046"
+    fecha_emision: "2023-07-25"
+    fecha_vencimiento: "2046-07-25"
+    tasa_cupon_nominal: 0.1150
+    frecuencia_cupon: "anual"
+    valor_nominal: 100.0
+    day_count_convention: "ACT/365"
+    fuente_verificacion: "MinHacienda DGCPTN, Informe Diario de Deuda Publica, 14-ago-2026, tabla Tasa Fija en Pesos, fila 22 (https://www.irc.gov.co/documents/d/guest/informe-diario-14-de-agosto-de-2026)"
+    fecha_verificacion: "2026-09-07"
+    tramo_curva: "largo"
+    saldo_vigente_cop_mm: 38226554
+    precio_limpio_ref: 96.451
+    tasa_ref: 0.11970
+    duracion_ref: 8.37
+    fuente_precio: "SEN"
+    campos_no_verificados: ["isin", "fecha_emision"]
+
+  - isin: null
+    nemotecnico: "TFIT31261050"
+    nombre_corto: "TES 7.25% 2050"
+    fecha_emision: "2019-10-26"
+    fecha_vencimiento: "2050-10-26"
+    tasa_cupon_nominal: 0.0725
+    frecuencia_cupon: "anual"
+    valor_nominal: 100.0
+    day_count_convention: "ACT/365"
+    fuente_verificacion: "MinHacienda DGCPTN, Informe Diario de Deuda Publica, 14-ago-2026, fila 23; el cupon de 7,25% coincide con el comunicado MinHacienda de lanzamiento del TES 2050 (plazo mas largo emitido en la curva en pesos)"
+    fecha_verificacion: "2026-09-07"
+    tramo_curva: "largo"
+    saldo_vigente_cop_mm: 19913239
+    precio_limpio_ref: 63.601
+    tasa_ref: 0.11868
+    duracion_ref: 8.65
+    fuente_precio: "SEN"
+    campos_no_verificados: ["isin", "fecha_emision"]
+
+  - isin: null
+    nemotecnico: "TFIT34130358"
+    nombre_corto: "TES 12.00% 2058"
+    fecha_emision: "2024-03-13"
+    fecha_vencimiento: "2058-03-13"
+    tasa_cupon_nominal: 0.1200
+    frecuencia_cupon: "anual"
+    valor_nominal: 100.0
+    day_count_convention: "ACT/365"
+    fuente_verificacion: "MinHacienda DGCPTN, Informe Diario de Deuda Publica, 14-ago-2026, fila 24; cupon y vencimiento confirmados de forma independiente en el comunicado de subasta MinHacienda del 13-may-2026, Tabla 1 (referencia 32 anos, 13-mar-58, cupon 12,000%)"
+    fecha_verificacion: "2026-09-07"
+    tramo_curva: "largo"
+    saldo_vigente_cop_mm: 16324019
+    precio_limpio_ref: 99.390
+    tasa_ref: 0.12055
+    duracion_ref: 8.63
+    fuente_precio: "SEN"
+    campos_no_verificados: ["isin", "fecha_emision"]
+
+metadata:
+  fecha_construccion: "2026-09-07"
+  numero_bonos: 16
+  cobertura_temporal_minima: "1.2 anos"
+  cobertura_temporal_maxima: "31.5 anos"
+  fecha_referencia_tramos: "2026-09-07"
+  fecha_corte_datos_mercado: "2026-08-14"
+  definicion_tramos:
+    corto: "< 3 anos al vencimiento"
+    medio: "3 a 10 anos al vencimiento"
+    largo: "> 10 anos al vencimiento"
+  fuentes:
+    informe_diario_deuda_publica: "https://www.irc.gov.co/documents/d/guest/informe-diario-14-de-agosto-de-2026"
+    comunicado_subasta_tes_cop_no_09: "https://www.minhacienda.gov.co/documents/d/portal/informe-tes-subasta-cop-no-09"
+    frecuencia_cupon_banrep: "https://www.banrep.gov.co/es/glosario/tes"
+    day_count_superfinanciera: "Superintendencia Financiera de Colombia, Circular Basica Contable y Financiera (Circular Externa 100 de 1995), Capitulo I, numerales 6.1.1 b), 6.1.2 y 6.4"
+  advertencias:
+    - "fecha_emision NO esta verificada con fuente primaria para ningun bono. Se decodifico del nemotecnico (TFIT + plazo original en anos + DDMMYY del vencimiento), convencion que no aparece publicada en un documento oficial de MinHacienda ni de BanRep. La decodificacion es consistente con cinco comprobaciones cruzadas (los plazos remanentes 4/9/14/32 anos que el comunicado de subasta del 13-may-2026 asigna a los TES 2030/2035/2040/2058), pero sigue siendo derivada. No usar para nada distinto de documentacion: la calibracion NSS construye el calendario de cupones hacia atras desde fecha_vencimiento y no lee este campo."
+    - "isin queda en null en los 16 bonos. Ni MinHacienda ni BanRep publican el ISIN de los TES en fuente abierta; los unicos ISIN encontrados (formato COL17CT#####) provienen de un proveedor comercial de datos, que no es fuente primaria. El identificador autoritativo de este archivo es `nemotecnico`, que si aparece en el Informe Diario de Deuda Publica."
+    - "valor_nominal = 100.0 es la BASE DE COTIZACION (precio limpio por 100 de facial), verificada contra la columna Precio Limpio del informe diario. NO es la denominacion legal minima del titulo, que no se pudo verificar con fuente primaria. Si algun consumidor necesita la denominacion legal, debe obtenerla del reglamento de emision, no de este archivo."
+    - "day_count_convention = ACT/365 se toma de la norma de valoracion de la Superintendencia Financiera (dias exactos sobre base de ano de 365 dias), no de un reglamento especifico de TES. Es la convencion que aplica al mercado colombiano de renta fija en COP en su conjunto."
+    - "frecuencia_cupon = anual se apoya en el glosario de TES de BanRep, que dice que los TES 'usualmente' pagan un cupon anual fijo. El adverbio es del original. No se encontro un reglamento de emision que lo fije de forma incondicional para cada una de estas 16 referencias."
+    - "Los precios, tasas y duraciones (`precio_limpio_ref`, `tasa_ref`, `duracion_ref`) son una foto del 14-ago-2026 y quedan obsoletos de inmediato. Estan aqui como control de sanidad de la calibracion, no como insumo de precios. El pricer debe tomar precios del feed diario."
+    - "Se excluyeron del universo: (a) TFIT15260826, que vencia el 26-ago-2026 y cuyo precio venia marcado VAL (valoracion de PRECIA, sin negociacion) en lugar de SEN; (b) TFVT10260331, cuyo prefijo TFVT designa un instrumento distinto que no se pudo caracterizar con fuente primaria; (c) toda la curva TES UVR y los TCO (cero cupon), por ser otra curva."
+    - "Los 16 bonos incluidos cotizaron en SEN el 14-ago-2026 segun la columna de fuente del informe. Esa es la unica evidencia de liquidez que respalda el archivo; no hay volumen negociado por referencia."
+
+# ---------------------------------------------------------------------------
+# Convenciones de mercado y ajustes del solver. Los valores de `conventions`
+# replican los campos por bono de arriba y existen como default para cualquier
+# instrumento que se agregue sin declararlos.
+# ---------------------------------------------------------------------------
 conventions:
   currency: COP
   day_count: ACT/365
-  coupon_frequency: 1          # TES tasa fija pay annual coupons
+  coupon_frequency: 1          # TES tasa fija pagan cupon anual
   business_day_convention: MODIFIED_FOLLOWING
-  settlement_lag_days: 3       # T+3 on SEN/MEC
+  settlement_lag_days: 3       # T+3 en SEN/MEC
   face_value: 100.0
-  quote_type: clean_price      # per 100 of face
+  quote_type: clean_price      # por 100 de facial
 
 calibration:
-  min_instruments: 6           # six free NSS parameters
-  min_maturity_years: 0.25     # drop the very short end, it is repo-driven
-  max_maturity_years: 30.0
+  min_instruments: 6           # seis parametros NSS libres
+  min_maturity_years: 0.25     # el extremo muy corto lo manda el repo
+  max_maturity_years: 35.0
   exclude_stale_after_sessions: 3
   weight_by_inverse_duration: true
 
-# Populated in Phase 2. Each entry must carry a verified ISIN and issuance terms.
-bonds: []
-
-# Structural example of the expected entry shape (values are placeholders):
-#
-# bonds:
-#   - isin: "COXXXXXXXXXX"
-#     nickname: "TES 2028"
-#     issue_date: "2018-01-01"
-#     maturity_date: "2028-01-01"
-#     coupon_rate: 0.0000        # decimal, not percent
-#     coupon_frequency: 1
-#     day_count: "ACT/365"
-#     benchmark: true
-#     notes: "verify against the DGCP issuance notice before use"
-
-# IBR OIS pillars for the COP discount curve, also to be completed in Phase 2.
+# Pilares OIS de IBR para la curva de descuento COP. Pendientes de Fase 2:
+# ninguna fuente primaria de fixings IBR por plazo se verifico en esta pasada.
 ois_pillars: []
 
 fx:

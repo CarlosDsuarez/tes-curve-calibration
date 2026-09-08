@@ -17,6 +17,7 @@ pandas = "^2.2"
 # changes with legislation, so this is deliberately not pinned to one minor.
 holidays = ">=0.57,<1.0"
 pyyaml = "^6.0"
+jsonschema = "^4.23"
 requests = "^2.32"
 sodapy = "^2.2"
 xlwings = "^0.33"
@@ -36,6 +37,7 @@ pre-commit = "^3.8"
 pandas-stubs = "^2.2"
 types-requests = "^2.32"
 types-PyYAML = "^6.0"
+types-jsonschema = "^4.23"
 
 [tool.poetry.scripts]
 tes-pricer = "tes_pricer.interface.cli:main"

@@ -4,11 +4,15 @@ Nelson-Siegel-Svensson calibration on Colombian TES, COP OIS bootstrapping from
 IBR, and USD/COP forward pricing under covered interest parity.
 
 > **Status: Phase 1 — scaffolding.** The structure, tooling and contracts are in
-> place. Every numerical function currently raises `NotImplementedError`, and
-> `src/tes_pricer/config/tes_referencia.yaml` ships with an **empty** bond list.
-> Nothing here prices anything yet, and no number produced by this repository
-> should be used for anything until the phases below are implemented and the
-> benchmark tier passes against QuantLib.
+> place. Bond pricing functions and the benchmark universe validator are
+> implemented; most other numerical functions still raise `NotImplementedError`.
+> `src/tes_pricer/config/tes_referencia.yaml` now carries 16 TES tasa fija
+> references sourced from the MinHacienda daily public-debt report; two fields
+> (`isin`, `fecha_emision`) could not be tied to a primary source and are
+> flagged in `metadata.advertencias`, which
+> `tes_pricer.data.validators.validate_tes_referencia_yaml` re-reports as
+> warnings. Nothing here should be used for production until the benchmark tier
+> passes against QuantLib.
 
 ## Why the layout looks like this
 
