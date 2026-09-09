@@ -1073,7 +1073,7 @@ def validate_trm(
     breaches = frame[(values < minimum) | (values > maximum)].dropna(subset=["trm_cop_usd"])
     if not breaches.empty:
         sample = ", ".join(
-            f"{row.fecha.date()}={row.trm_cop_usd:,.2f}"
+            f"{_scalar_to_date(row.fecha)}={row.trm_cop_usd:,.2f}"
             for row in breaches.head(5).itertuples(index=False)
         )
         warns.append(
@@ -1123,7 +1123,7 @@ def validate_ibr(
     breaches = frame[(rates <= minimum) | (rates >= maximum)].dropna(subset=["ibr_tasa"])
     if not breaches.empty:
         sample = ", ".join(
-            f"{row.fecha.date()}={row.ibr_tasa:.6f}"
+            f"{_scalar_to_date(row.fecha)}={row.ibr_tasa:.6f}"
             for row in breaches.head(5).itertuples(index=False)
         )
         warns.append(
@@ -1206,12 +1206,16 @@ def _shape_trm(
 
     frame = frame.dropna(subset=["desde"])
     if expand_validity:
-        frame = frame.assign(
-            fecha=[
-                pd.date_range(row.desde, row.hasta, freq="D")
-                for row in frame.itertuples(index=False)
-            ]
-        ).explode("fecha", ignore_index=True)
+        expanded_fechas: list[pd.DatetimeIndex] = [
+            pd.date_range(
+                _scalar_to_timestamp(row.desde),
+                _scalar_to_timestamp(row.hasta),
+                freq="D",
+            )
+            for row in frame.itertuples(index=False)
+        ]
+        frame = frame.assign(fecha=expanded_fechas)  # type: ignore[arg-type]
+        frame = frame.explode("fecha", ignore_index=True)
     else:
         frame = frame.assign(fecha=frame["desde"])
 
@@ -1299,6 +1303,22 @@ def _require_ordered_window(start_date: date, end_date: date) -> None:
 def _soql_timestamp(day: date) -> str:
     """Render a date as the floating timestamp literal SoQL expects."""
     return f"{day.isoformat()}T00:00:00.000"
+
+
+def _scalar_to_timestamp(value: object) -> pd.Timestamp:
+    """Coerce a pandas scalar from ``itertuples`` to a ``Timestamp``."""
+    if isinstance(value, pd.Timestamp):
+        return value
+    if isinstance(value, datetime):
+        return pd.Timestamp(value)
+    if isinstance(value, date):
+        return pd.Timestamp(value)
+    return pd.Timestamp(value)  # type: ignore[arg-type]
+
+
+def _scalar_to_date(value: object) -> date:
+    """Coerce a pandas scalar from ``itertuples`` to a calendar date."""
+    return _scalar_to_timestamp(value).date()
 
 
 def _epoch_to_datetime(value: object) -> datetime | None:
