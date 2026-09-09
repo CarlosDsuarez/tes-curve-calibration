@@ -54,17 +54,75 @@ The default `pytest` run is the offline unit tier: no network, no QuantLib.
 | Marker | Requires | Command |
 | --- | --- | --- |
 | `unit` | nothing beyond the core deps | `pytest` |
-| `integration` | network + opt-in env var | `TES_PRICER_ALLOW_NETWORK=1 pytest -m integration` |
+| `integration` | nothing; replays archived fixtures | `pytest -m integration` |
 | `benchmark` | QuantLib installed | `pytest -m benchmark` |
+| `network` | network + opt-in env var | `TES_PRICER_ALLOW_NETWORK=1 pytest -m network` |
 
 `integration` and `benchmark` are deselected by `addopts`, and skipped with an
 explicit reason if selected on a machine that cannot run them. QuantLib is a
 referee, not a dependency: nothing under `src/` imports it.
 
+`network` is a separate axis from `integration`, not a synonym for it. An
+integration test is one that runs several modules together; the end-to-end
+pipeline does exactly that against an archived snapshot, offline and
+deterministically, which is what lets CI run it. Only the tests that actually
+reach a live endpoint carry `network`, and only those need the opt-in.
+
 Unimplemented functions are covered by tests marked
 `xfail(raises=NotImplementedError, strict=True)`. The suite is green now, and
 turns red the moment an implementation lands that does not meet the stated
 contract.
+
+### The end-to-end run
+
+`tests/integration/test_end_to_end_pipeline.py` is the only place where
+ingestion, yield inversion, NSS calibration, the COP and USD short curves, the
+USD/COP forward and its greeks run in sequence, in one process, off one
+snapshot. That is where the failures *between* modules show up - a day count
+that disagrees across two phases, a percent that should have been a decimal, a
+curve read at the wrong point of its own axis.
+
+```bash
+pytest -m integration tests/integration/test_end_to_end_pipeline.py
+```
+
+The snapshot is 14 August 2026, frozen: it is the one day this repository holds
+a per-bond price set with a citation. `tests/fixtures/e2e_20260814/PROVENANCE.md`
+gives the verification tier of every input, including the two that are scenario
+assumptions rather than sourced fixings. A run writes
+`reports/e2e_pipeline_report.{html,md}` - what went in, what each stage
+produced, and which economic property was asserted about it. CI uploads it as a
+build artifact.
+
+One extra test, marked `network`, re-fetches the TRM for the snapshot date from
+datos.gov.co and asserts the cached FX spot still equals what the
+Superintendencia Financiera publishes. A cached number nobody re-checks against
+its source stops being data and becomes folklore.
+
+### Coverage floors
+
+Two, because two tiers of code carry different consequences when they go
+untested:
+
+| Scope | Floor | Enforced by |
+| --- | --- | --- |
+| `src/tes_pricer` | 85% | `fail_under` in `[tool.coverage.report]` |
+| `src/tes_pricer/math/` | 95% | `scripts/check_coverage.py` |
+
+The second needs its own script because coverage's `fail_under` is global and
+has no per-package form. The numerical core carries the tighter floor: a
+silently wrong discount factor does not raise, it prices, and the curve, the
+forward and the greeks downstream inherit the error with no symptom.
+
+```bash
+pytest -m "not network" --cov=src/tes_pricer --cov-report=json
+python scripts/check_coverage.py
+```
+
+Both exit non-zero below their floor, and CI runs them in that order.
+`raise NotImplementedError` is excluded from the measurement, so an
+unimplemented stub is not counted as a missed line - its signature and docstring
+still are, which is why a module of pure stubs does not reach 100%.
 
 ## Provenance
 

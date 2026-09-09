@@ -26,7 +26,7 @@ from tes_pricer.data.suameca_client import (
     SuamecaSeries,
 )
 
-pytestmark = [pytest.mark.integration]
+pytestmark = [pytest.mark.integration, pytest.mark.network]
 
 
 @pytest.fixture

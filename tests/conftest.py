@@ -38,6 +38,13 @@ def pytest_collection_modifyitems(
     The marker expression in ``addopts`` already deselects these by default; this
     hook is what keeps an explicit ``-m benchmark`` run honest on a machine
     without QuantLib, or ``-m integration`` without network opt-in.
+
+    The network gate keys off ``network``, not ``integration``. The two are not
+    the same thing: an integration test is one that runs several modules
+    together, and the end-to-end pipeline does exactly that against an archived
+    snapshot - offline and deterministically, which is what lets CI run it.
+    Only the tests that actually reach a live endpoint carry ``network``, and
+    only those are skipped without the opt-in.
     """
     del config
     needs_quantlib = pytest.mark.skip(reason="QuantLib is not installed")
@@ -47,7 +54,7 @@ def pytest_collection_modifyitems(
     for item in items:
         if "benchmark" in item.keywords and not QUANTLIB_AVAILABLE:
             item.add_marker(needs_quantlib)
-        if "integration" in item.keywords and not NETWORK_ENABLED:
+        if "network" in item.keywords and not NETWORK_ENABLED:
             item.add_marker(needs_network)
 
 

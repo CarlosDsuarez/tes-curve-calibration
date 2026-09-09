@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # No job here is allowed to touch a live endpoint. The offline tiers replay
+  # archived snapshots, which is what makes a CI run reproducible; the `network`
+  # tier is opt-in and stays out of the pipeline on purpose.
+  TES_PRICER_ALLOW_NETWORK: "0"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Install dependencies
+        run: poetry install --with dev,test
+
+      - name: Lint
+        run: poetry run ruff check .
+
+      - name: Type check
+        run: poetry run mypy
+
+      - name: Test, offline tiers, with coverage
+        # `-m "not network"` overrides the default marker expression in
+        # pyproject.toml, so this runs unit + the end-to-end integration test +
+        # the QuantLib benchmarks, and skips only what needs a live endpoint.
+        # `fail_under = 85` in [tool.coverage.report] fails this step on its own
+        # if the package-wide floor slips.
+        run: >
+          poetry run pytest -m "not network"
+          --cov=src/tes_pricer
+          --cov-report=term-missing:skip-covered
+          --cov-report=json
+          --cov-report=xml
+
+      - name: Enforce per-package coverage floors
+        # The 95% floor on the numerical core, which coverage's global
+        # `fail_under` cannot express. A non-zero exit fails the build.
+        run: poetry run python scripts/check_coverage.py
+
+      - name: Upload the end-to-end evidence report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-evidence-report-py${{ matrix.python-version }}
+          path: |
+            reports/e2e_pipeline_report.html
+            reports/e2e_pipeline_report.md
+          if-no-files-found: warn

@@ -11,6 +11,7 @@ tenor and turns each forward into a number that can be checked by hand.
 
 from __future__ import annotations
 
+import warnings
 from datetime import date, timedelta
 
 import numpy as np
@@ -22,6 +23,7 @@ from tes_pricer.math.fx_forward import (
     FXForwardQuote,
     OptionType,
     check_forward_points_sign,
+    forward_points,
     forward_rate_cip,
     garman_kohlhagen_price,
     implied_forward_points,
@@ -366,6 +368,216 @@ def test_forward_rate_cip_rejects_mismatched_shapes() -> None:
             np.array([0.97, 0.94], dtype=np.float64),
             np.array([0.99], dtype=np.float64),
         )
+
+
+# --------------------------------------------------------------------------- #
+# FXForwardQuote validates its own fields
+# --------------------------------------------------------------------------- #
+
+
+def quote_fields(**overrides: object) -> dict[str, object]:
+    """A self-consistent quote, with individual fields overridden.
+
+    ``r_cop > r_usd`` and the points are positive, so the sign check stays quiet
+    and whatever a test below raises is the error it was aiming at rather than a
+    warning turned into one.
+    """
+    fields: dict[str, object] = {
+        "spot_rate": SPOT,
+        "forward_rate": 4276.0,
+        "forward_points": implied_forward_points(SPOT, 4276.0),
+        "tenor_years": 1.0,
+        "r_cop": 0.1150,
+        "r_usd": 0.0430,
+        "valuation_date": VALUATION_DATE,
+        "maturity_date": ONE_YEAR_LATER,
+    }
+    fields.update(overrides)
+    return fields
+
+
+def test_baseline_quote_constructs_silently() -> None:
+    """Guard the fixture: the rejection tests below must fail for their own
+    reason, not because the baseline was already invalid or already warning."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        quote = FXForwardQuote(**quote_fields())  # type: ignore[arg-type]
+    assert quote.forward_rate > quote.spot_rate
+    assert quote.forward_points > 0.0
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("spot_rate", float("nan")),
+        ("forward_rate", float("inf")),
+        ("forward_points", float("nan")),
+        ("tenor_years", float("inf")),
+        ("r_cop", float("nan")),
+        ("r_usd", float("-inf")),
+    ],
+)
+def test_quote_rejects_non_finite_fields(field: str, value: float) -> None:
+    """Every numeric field is checked, and the message names the offender.
+
+    A NaN that survives construction propagates silently through the sign check
+    (every comparison against NaN is False) and out into a booked price.
+    """
+    with pytest.raises(ValueError, match=f"{field} must be finite"):
+        FXForwardQuote(**quote_fields(**{field: value}))  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("bad_spot", [0.0, -4000.0])
+def test_quote_rejects_non_positive_spot(bad_spot: float) -> None:
+    """Spot is COP per USD; zero or negative is a data error, not a market."""
+    with pytest.raises(ValueError, match="spot_rate must be positive"):
+        FXForwardQuote(**quote_fields(spot_rate=bad_spot))  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("bad_forward", [0.0, -4276.0])
+def test_quote_rejects_non_positive_forward(bad_forward: float) -> None:
+    """Same quoting convention, same constraint, checked separately so the
+    message says which of the two legs is wrong."""
+    with pytest.raises(ValueError, match="forward_rate must be positive"):
+        FXForwardQuote(**quote_fields(forward_rate=bad_forward))  # type: ignore[arg-type]
+
+
+def test_quote_rejects_negative_tenor() -> None:
+    """A forward cannot settle before it is priced. Zero is legal - a same-day
+    quote - so the boundary is strict on negatives only."""
+    with pytest.raises(ValueError, match="tenor_years must be non-negative"):
+        FXForwardQuote(**quote_fields(tenor_years=-1.0))  # type: ignore[arg-type]
+
+
+def test_quote_accepts_a_zero_tenor() -> None:
+    """The complement of the test above: T = 0 is spot, and it constructs."""
+    quote = FXForwardQuote(**quote_fields(tenor_years=0.0))  # type: ignore[arg-type]
+    assert quote.tenor_years == 0.0
+
+
+# --------------------------------------------------------------------------- #
+# The points helpers reject what they cannot convert
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    ("spot", "forward"),
+    [(float("nan"), 4276.0), (SPOT, float("inf")), (float("inf"), float("nan"))],
+)
+def test_implied_forward_points_rejects_non_finite_inputs(spot: float, forward: float) -> None:
+    """``(F - S) * 10000`` on a NaN returns a NaN rather than failing, so the
+    guard has to be explicit."""
+    with pytest.raises(ValueError, match="must be finite"):
+        implied_forward_points(spot, forward)
+
+
+@pytest.mark.parametrize(("spot", "forward"), [(0.0, 4276.0), (SPOT, 0.0), (-4000.0, -4276.0)])
+def test_implied_forward_points_rejects_non_positive_inputs(spot: float, forward: float) -> None:
+    """Both legs are COP per USD, so both are strictly positive."""
+    with pytest.raises(ValueError, match="must be positive"):
+        implied_forward_points(spot, forward)
+
+
+@pytest.mark.parametrize(("spot", "points"), [(float("nan"), 100.0), (SPOT, float("inf"))])
+def test_implied_forward_rate_from_points_rejects_non_finite_inputs(
+    spot: float, points: float
+) -> None:
+    """The inverse direction carries the same guard as the forward one."""
+    with pytest.raises(ValueError, match="must be finite"):
+        implied_forward_rate_from_points(spot, points)
+
+
+@pytest.mark.parametrize("bad_spot", [0.0, -4000.0])
+def test_implied_forward_rate_from_points_rejects_non_positive_spot(bad_spot: float) -> None:
+    """Points are a spread on spot; without a positive spot there is nothing to
+    add them to."""
+    with pytest.raises(ValueError, match="spot is COP per USD and must be positive"):
+        implied_forward_rate_from_points(bad_spot, 100.0)
+
+
+def test_implied_forward_rate_from_points_rejects_points_that_wipe_out_spot() -> None:
+    """-40,000,000 points against a spot of 4000 is a forward of exactly zero on
+    this scale - and on a desk quoting plain COP it is a perfectly ordinary
+    -40m move quoted in the wrong multiple. The message says so, because a
+    scale mismatch is four orders of magnitude and looks nothing like a pricing
+    bug until someone is told where to look."""
+    with pytest.raises(ValueError, match="points scale"):
+        implied_forward_rate_from_points(SPOT, -SPOT * 10000.0)
+
+
+# --------------------------------------------------------------------------- #
+# forward_rate_cip and forward_points reject unusable curves
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize("bad_spot", [0.0, -4000.0, float("nan"), float("inf")])
+def test_forward_rate_cip_rejects_non_positive_spot(bad_spot: float) -> None:
+    """``F = S * DF_usd / DF_cop`` scales spot, so a bad spot is a bad forward
+    at every tenor at once."""
+    discount = np.array([0.97], dtype=np.float64)
+    with pytest.raises(ValueError, match="spot is COP per USD"):
+        forward_rate_cip(bad_spot, discount, discount)
+
+
+@pytest.mark.parametrize("bad_factor", [0.0, -0.97, float("nan"), float("inf")])
+def test_forward_rate_cip_rejects_a_bad_domestic_discount_factor(bad_factor: float) -> None:
+    """A zero or negative COP factor divides into the forward: the result is an
+    infinity or a sign flip, neither of which the sign check can attribute."""
+    with pytest.raises(ValueError, match="domestic_discount"):
+        forward_rate_cip(
+            SPOT,
+            np.array([bad_factor], dtype=np.float64),
+            np.array([0.97], dtype=np.float64),
+        )
+
+
+@pytest.mark.parametrize("bad_factor", [0.0, -0.97, float("nan"), float("inf")])
+def test_forward_rate_cip_rejects_a_bad_foreign_discount_factor(bad_factor: float) -> None:
+    """Checked separately from the domestic leg so the message names the curve
+    that is broken rather than 'one of them'."""
+    with pytest.raises(ValueError, match="foreign_discount"):
+        forward_rate_cip(
+            SPOT,
+            np.array([0.97], dtype=np.float64),
+            np.array([bad_factor], dtype=np.float64),
+        )
+
+
+def test_forward_points_uses_the_project_scale_by_default() -> None:
+    """4276 against a spot of 4000 is 276 COP, which is 2,760,000 points on this
+    project's (F - S) * 10000 convention. Vectorised over the tenor axis."""
+    points = forward_points(SPOT, np.array([4276.0, 3900.0], dtype=np.float64))
+    assert points == pytest.approx(np.array([2_760_000.0, -1_000_000.0]), rel=1e-15)
+
+
+def test_forward_points_agrees_with_the_scalar_helper() -> None:
+    """The vectorised and scalar forms are the same convention seen twice; if
+    they drift apart, one of the two callers is quoting a different market."""
+    outrights = np.array([4276.0, 4100.0, 3900.0], dtype=np.float64)
+    vectorised = forward_points(SPOT, outrights)
+    scalar = [implied_forward_points(SPOT, float(f)) for f in outrights]
+    assert vectorised == pytest.approx(np.array(scalar), rel=1e-15)
+
+
+def test_forward_points_scale_of_one_gives_raw_cop() -> None:
+    """COP desks quote USD/COP points in plain COP too, which is the whole
+    reason ``scale`` is an argument."""
+    points = forward_points(SPOT, np.array([4276.0], dtype=np.float64), scale=1.0)
+    assert points[0] == pytest.approx(276.0, rel=1e-15)
+
+
+@pytest.mark.parametrize("bad_spot", [0.0, -4000.0, float("nan"), float("inf")])
+def test_forward_points_rejects_non_positive_spot(bad_spot: float) -> None:
+    """Points are measured from spot; an invalid spot makes every point invalid."""
+    with pytest.raises(ValueError, match="spot is COP per USD"):
+        forward_points(bad_spot, np.array([4276.0], dtype=np.float64))
+
+
+@pytest.mark.parametrize("bad_scale", [float("nan"), float("inf")])
+def test_forward_points_rejects_a_non_finite_scale(bad_scale: float) -> None:
+    """A non-finite multiplier silently turns a valid difference into NaN."""
+    with pytest.raises(ValueError, match="scale must be finite"):
+        forward_points(SPOT, np.array([4276.0], dtype=np.float64), scale=bad_scale)
 
 
 @pytest.mark.xfail(raises=NotImplementedError, reason="Phase 8", strict=True)

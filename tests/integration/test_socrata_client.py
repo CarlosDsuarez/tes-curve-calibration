@@ -34,7 +34,7 @@ from tes_pricer.data.socrata_client import (
     SocrataDataUnavailableError,
 )
 
-pytestmark = [pytest.mark.integration]
+pytestmark = [pytest.mark.integration, pytest.mark.network]
 
 # The portal's first published TRM is 1991-12-02, so the history cannot shrink
 # below this without something having gone badly wrong upstream.

@@ -54,8 +54,9 @@ minversion = "8.0"
 testpaths = ["tests"]
 pythonpath = ["src"]
 # Default run is the offline, dependency-light suite. Opt in explicitly:
-#   pytest -m integration      (needs network)
-#   pytest -m benchmark        (needs QuantLib)
+#   pytest -m integration                            (offline; replays fixtures)
+#   TES_PRICER_ALLOW_NETWORK=1 pytest -m network     (live endpoints)
+#   pytest -m benchmark                              (needs QuantLib)
 addopts = [
     "--strict-markers",
     "--strict-config",
@@ -64,17 +65,39 @@ addopts = [
 ]
 markers = [
     "unit: pure, offline, no network and no QuantLib required",
-    "integration: hits a live endpoint (SUAMECA / datos.gov.co); requires network",
+    "integration: several modules run together end to end; offline unless also marked network",
     "benchmark: cross-checks numerics against QuantLib; requires QuantLib installed",
+    "network: reaches a live endpoint (SUAMECA / datos.gov.co); needs TES_PRICER_ALLOW_NETWORK=1",
 ]
 
+# --------------------------------------------------------------------------- #
+# coverage
+#
+# Two thresholds, because two tiers of code carry different consequences.
+#
+# The package-wide 85% is the floor for the repository as a whole, enforced by
+# coverage itself through `fail_under` below: any run that passes `--cov` exits
+# non-zero when it slips, so the CI job fails without needing its own logic.
+#
+# The 95% floor on `src/tes_pricer/math/` cannot be expressed here - coverage's
+# `fail_under` is global and has no per-package form. `scripts/check_coverage.py`
+# enforces both floors off the JSON report, and CI runs it after pytest.
+# --------------------------------------------------------------------------- #
 [tool.coverage.run]
 source = ["src/tes_pricer"]
 branch = true
 
 [tool.coverage.report]
 show_missing = true
+# `raise NotImplementedError` is excluded so an unimplemented stub is not
+# counted as a missed line. Its signature and docstring still count, which is
+# why a module of pure stubs does not reach 100%.
 exclude_lines = ["pragma: no cover", "raise NotImplementedError"]
+fail_under = 85
+precision = 2
+
+[tool.coverage.json]
+output = "coverage.json"
 
 # --------------------------------------------------------------------------- #
 # ruff

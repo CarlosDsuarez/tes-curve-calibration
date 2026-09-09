@@ -1,0 +1,73 @@
+# ---------------------------------------------------------------------------
+# Non-TES market inputs for the end-to-end pipeline test, 14-ago-2026.
+#
+# Each block declares its own `nivel_verificacion`, and the end-to-end report
+# prints that tier next to every number it used. The tiers are:
+#
+#   FUENTE_PRIMARIA  the number comes from the publishing authority and can be
+#                    re-fetched and compared byte for byte.
+#   SUPUESTO         the number is an assumption of this test scenario. No open
+#                    primary source publishes it, so it is stated rather than
+#                    sourced. Every assertion downstream of it is written to
+#                    depend on its *sign* or on an internal reconciliation,
+#                    never on its level.
+#
+# Rationale for the SUPUESTO blocks, both of which are documented limitations
+# of the data layer rather than gaps in this fixture:
+#
+#   * IBR. datos.gov.co asset ev8i-uzwt ("IBR - Indicador Bancario de
+#     Referencia") is an `href` stub with no rows; see
+#     `tests/integration/test_socrata_client.py` and
+#     `SocrataClient.fetch_ibr`, which raises rather than returning empty.
+#     Banco de la Republica publishes IBR on SUAMECA, but no IBR series id has
+#     been verified against a primary source in this repository yet, and
+#     guessing one would put an unverified number behind a verified-looking API
+#     call.
+#   * SOFR term pillars. Free public SOFR term rates do not exist: the New York
+#     Fed's 30/90/180-day Averages are compounded in arrears, and CME Term SOFR
+#     is licensed. See `build_usd_short_curve`.
+# ---------------------------------------------------------------------------
+schema_version: "1.0.0"
+snapshot_date: "2026-08-14"
+
+fx_spot:
+  nivel_verificacion: FUENTE_PRIMARIA
+  cop_per_usd: 3127.51
+  fuente: >-
+    Superintendencia Financiera de Colombia, Tasa Representativa del Mercado,
+    published on datos.gov.co as dataset 32sa-8pi3; validity window covering
+    2026-08-14. Re-fetch with SocrataClient.fetch_trm; the live arm of the
+    end-to-end test does exactly that.
+  fecha_verificacion: "2026-09-08"
+
+cop_short_curve:
+  nivel_verificacion: SUPUESTO
+  fuente: >-
+    Scenario assumption. Shape only: a mildly upward-sloping IBR strip a little
+    over three points below the fitted TES level, which is the ordering a COP
+    curve has under a positive term premium. Replace wholesale once an IBR
+    series id is verified.
+  pillars_effective_annual:
+    overnight: 0.0925
+    "1M": 0.0930
+    "3M": 0.0945
+    "6M": 0.0960
+    "12M": 0.0985
+
+usd_short_curve:
+  nivel_verificacion: SUPUESTO
+  fuente: >-
+    Scenario assumption. Shape only: an overnight SOFR fixing with a slightly
+    inverted term strip. Replace with a licensed Term SOFR feed through
+    build_usd_short_curve(additional_tenors=...).
+  pillars_effective_annual:
+    overnight: 0.0410
+    "3M": 0.0405
+    "6M": 0.0398
+    "12M": 0.0390
+
+forward_trade:
+  # The trade the pipeline is asked to price, per the Phase 6/7 acceptance test.
+  notional_usd: 100000.0
+  tenor_days: 90
+  direction: long_usd
