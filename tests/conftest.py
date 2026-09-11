@@ -105,3 +105,57 @@ def sample_nss_params() -> dict[str, float]:
         "lambda1": 1.5,
         "lambda2": 8.0,
     }
+
+
+@pytest.fixture
+def sample_calibration_snapshot(
+    sample_bond_terms: dict[str, object],
+    sample_nss_params: dict[str, float],
+    settlement_date: date,
+) -> object:
+    """A complete, synthetic calibration snapshot for the interface-layer tests.
+
+    Everything the Excel bridge reads from ``latest_calibration.json`` - the
+    fitted NSS curve, both short-end curves, the FX spot and the bond universe -
+    built from the shared synthetic fixtures so no test depends on an archived
+    market day. Imports are local so collection stays dependency-light.
+    """
+    import numpy as np
+
+    from tes_pricer.interface.calibration_cache import CalibrationSnapshot
+    from tes_pricer.math.bond_pricing import BondTerms
+    from tes_pricer.math.nss_model import NSSParams
+    from tes_pricer.math.ois_curve import ShortRateCurve
+
+    terms = BondTerms(**sample_bond_terms)  # type: ignore[arg-type]
+    return CalibrationSnapshot(
+        calibration_date=settlement_date,
+        generated_at="2026-09-10T12:00:00+00:00",
+        params=NSSParams(**sample_nss_params),
+        diagnostics={
+            "rmse_bps": 3.25,
+            "max_abs_error_bps": 7.5,
+            "n_bonds_used": 1,
+            "converged": True,
+            "n_starts_tried": 25,
+            "n_starts_converged": 25,
+            "warnings": [],
+            "per_bond_errors_bps": {terms.isin: 0.5},
+        },
+        cop_curve=ShortRateCurve(
+            tenors_years=np.array([1.0 / 365.0, 1.0 / 12.0, 0.25, 0.5, 1.0]),
+            rates=np.array([0.0925, 0.0930, 0.0945, 0.0960, 0.0985]),
+            currency="COP",
+            curve_date=settlement_date,
+        ),
+        usd_curve=ShortRateCurve(
+            tenors_years=np.array([1.0 / 365.0, 0.25, 0.5, 1.0]),
+            rates=np.array([0.0410, 0.0405, 0.0398, 0.0390]),
+            currency="USD",
+            curve_date=settlement_date,
+        ),
+        fx_spot_cop_per_usd=4000.0,
+        bonds={terms.isin: terms},
+        aliases={"COL17CT00001": terms.isin},
+        sources={"prices": "synthetic", "market_snapshot": "synthetic"},
+    )

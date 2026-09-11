@@ -65,6 +65,14 @@ __all__ = [
 # years, which the single-ratio formula below cannot express.
 _SUPPORTED_DAY_COUNTS = frozenset({DayCount.ACT_365, DayCount.ACT_360, DayCount.THIRTY_360})
 
+# Annual basis each convention divides its accrual days by when a year fraction
+# is needed on its own, as opposed to the period ratios used for accrual.
+_ANNUAL_BASIS_DAYS = {
+    DayCount.ACT_365: 365.0,
+    DayCount.ACT_360: 360.0,
+    DayCount.THIRTY_360: 360.0,
+}
+
 # Coupon frequencies that divide the year into whole months.
 _SUPPORTED_FREQUENCIES = frozenset({1, 2, 4, 12})
 
@@ -543,7 +551,7 @@ def yield_to_maturity(
 
 
 # --------------------------------------------------------------------------- #
-# Still to come
+# Curve-consistent pricing
 # --------------------------------------------------------------------------- #
 def generate_cashflow_schedule(
     terms: BondTerms,
@@ -551,12 +559,55 @@ def generate_cashflow_schedule(
 ) -> pd.DataFrame:
     """Build the remaining cash flows of a bond as of ``settlement_date``.
 
+    The schedule is rolled backwards from ``terms.maturity_date`` by
+    :func:`_coupon_schedule`, so it is the same set of dates the yield-based
+    pricers discount; only the time axis differs. ``year_fraction`` is measured
+    from ``settlement_date`` under ``terms.day_count`` with that convention's
+    annual basis (365 for ACT/365, 360 otherwise), which for a TES is the same
+    ACT/365 axis the NSS curve was calibrated on.
+
+    Args:
+        terms: The bond.
+        settlement_date: Valuation date; must be strictly before maturity.
+
     Returns:
         A DataFrame with columns ``payment_date``, ``year_fraction``,
-        ``coupon``, ``principal`` and ``cashflow``, restricted to flows strictly
-        after ``settlement_date``.
+        ``coupon``, ``principal`` and ``cashflow``, one row per remaining flow in
+        ascending date order and restricted to flows strictly after
+        ``settlement_date``. A coupon falling on ``settlement_date`` belongs to
+        the seller and is excluded.
+
+    Raises:
+        ValueError: If settlement is on or after maturity, or the day count or
+            frequency is unsupported.
     """
-    raise NotImplementedError("Phase 4: cash flow schedule generation")
+    convention = _normalise_day_count(terms.day_count)
+    _validate_frequency(terms.coupon_frequency)
+    if settlement_date >= terms.maturity_date:
+        raise ValueError(
+            f"settlement {settlement_date} is on or after maturity {terms.maturity_date}: "
+            "no cash flows remain"
+        )
+
+    _, payment_dates = _coupon_schedule(
+        settlement_date, terms.maturity_date, terms.coupon_frequency
+    )
+    basis = _ANNUAL_BASIS_DAYS[convention]
+    coupon = _periodic_coupon(terms.coupon_rate, terms.face_value, terms.coupon_frequency)
+    last_index = len(payment_dates) - 1
+
+    rows = [
+        {
+            "payment_date": payment_date,
+            "year_fraction": _accrual_days(settlement_date, payment_date, convention) / basis,
+            "coupon": coupon,
+            "principal": terms.face_value if index == last_index else 0.0,
+        }
+        for index, payment_date in enumerate(payment_dates)
+    ]
+    schedule = pd.DataFrame(rows, columns=["payment_date", "year_fraction", "coupon", "principal"])
+    schedule["cashflow"] = schedule["coupon"] + schedule["principal"]
+    return schedule
 
 
 def price_from_discount_factors(
@@ -565,7 +616,31 @@ def price_from_discount_factors(
 ) -> float:
     """Present value of ``cashflows`` under an arbitrary discount curve.
 
-    This is the curve-consistent pricing entry point used by the NSS calibration
-    objective: it never assumes a flat yield.
+    ``P = sum_i CF_i * DF_i``. This is the curve-consistent pricing entry point:
+    it never assumes a flat yield, and it is agnostic to the compounding basis
+    that produced the discount factors - the caller owns that choice.
+
+    Args:
+        cashflows: Amounts, one per flow.
+        discount_factors: Discount factor to each flow's payment date, aligned
+            with ``cashflows``.
+
+    Returns:
+        The dirty (full) price, in the units of ``cashflows``.
+
+    Raises:
+        ValueError: If the two arrays differ in shape, or any discount factor is
+            not strictly positive and finite.
     """
-    raise NotImplementedError("Phase 4: curve-consistent pricing")
+    flows = np.asarray(cashflows, dtype=np.float64)
+    factors = np.asarray(discount_factors, dtype=np.float64)
+    if flows.shape != factors.shape:
+        raise ValueError(
+            f"cashflows and discount_factors must have the same shape; "
+            f"got {flows.shape} and {factors.shape}"
+        )
+    if not np.all(np.isfinite(factors)) or np.any(factors <= 0.0):
+        raise ValueError(
+            f"discount factors must be strictly positive and finite; got {factors.tolist()}"
+        )
+    return float(np.sum(flows * factors))

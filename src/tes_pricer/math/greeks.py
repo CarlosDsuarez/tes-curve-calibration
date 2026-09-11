@@ -25,9 +25,13 @@ from typing import Final
 import numpy as np
 from numpy.typing import NDArray
 
-from tes_pricer.math.bond_pricing import BondTerms
+from tes_pricer.math.bond_pricing import (
+    BondTerms,
+    generate_cashflow_schedule,
+    price_from_discount_factors,
+)
 from tes_pricer.math.fx_forward import OptionType
-from tes_pricer.math.nss_model import NSSParams
+from tes_pricer.math.nss_model import NSSParams, nss_discount_factor
 from tes_pricer.math.ois_curve import ShortRateCurve
 
 BASIS_POINT = 1e-4
@@ -71,6 +75,40 @@ def dv01_from_ytm(
     raise NotImplementedError("Phase 8: DV01 from YTM")
 
 
+def _curve_cashflows(
+    terms: BondTerms, settlement_date: date
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """The bond's remaining ``(year_fractions, cashflows)`` on the curve's time axis."""
+    schedule = generate_cashflow_schedule(terms, settlement_date)
+    taus = schedule["year_fraction"].to_numpy(dtype=np.float64)
+    flows = schedule["cashflow"].to_numpy(dtype=np.float64)
+    return taus, flows
+
+
+def _curve_price(taus: NDArray[np.float64], flows: NDArray[np.float64], params: NSSParams) -> float:
+    """Dirty price of the flows on the NSS curve, continuously compounded."""
+    factors = np.asarray(nss_discount_factor(taus, params), dtype=np.float64)
+    return price_from_discount_factors(flows, factors)
+
+
+def _shifted(params: NSSParams, shift: float) -> NSSParams:
+    """The curve shifted in parallel: every zero rate moves by ``shift``.
+
+    ``beta0`` enters the NSS zero rate with a loading of exactly one at every
+    maturity, so bumping it alone *is* the parallel shift - no per-tenor
+    machinery needed.
+    """
+    return replace(params, beta0=params.beta0 + shift)
+
+
+def _validate_curve_params(params: NSSParams) -> None:
+    if params.lambda1 <= 0.0 or params.lambda2 <= 0.0:
+        raise ValueError(
+            f"lambda1 and lambda2 must be strictly positive; "
+            f"got {params.lambda1} and {params.lambda2}"
+        )
+
+
 def dv01_from_curve(
     terms: BondTerms,
     settlement_date: date,
@@ -80,10 +118,81 @@ def dv01_from_curve(
 ) -> float:
     """DV01 under a parallel shift of the whole NSS curve (``beta0`` bump).
 
-    This is the number a curve-based book actually hedges on; the flat-yield
-    variant above is kept for reconciliation against street quotes.
+    Bump-and-reprice, one-sided and upward: ``DV01 = P(curve) - P(curve + bump)``,
+    so a long position reports a positive number. This is the number a
+    curve-based book actually hedges on; the flat-yield variant above is kept
+    for reconciliation against street quotes.
+
+    Args:
+        terms: The bond.
+        settlement_date: Valuation date.
+        params: The calibrated curve.
+        bump: Parallel shift in the zero rate, as a decimal (1bp by default).
+
+    Returns:
+        Price change per ``terms.face_value`` of face for a ``bump`` shift.
+
+    Raises:
+        ValueError: If ``params`` carries a non-positive decay constant, or the
+            bond has no remaining flows.
     """
-    raise NotImplementedError("Phase 8: curve DV01")
+    _validate_curve_params(params)
+    taus, flows = _curve_cashflows(terms, settlement_date)
+    return _curve_price(taus, flows, params) - _curve_price(taus, flows, _shifted(params, bump))
+
+
+def bond_risk_from_curve(
+    terms: BondTerms,
+    settlement_date: date,
+    params: NSSParams,
+    *,
+    bump: float = BASIS_POINT,
+) -> BondRisk:
+    """DV01, Macaulay and modified duration, and convexity off the NSS curve.
+
+    Every flow is discounted on the calibrated curve rather than at one flat
+    yield, so these are the curve-consistent sensitivities to a parallel shift
+    of the zero rates:
+
+    * ``macaulay_duration`` is the analytic cash-flow-weighted time,
+      ``sum_i t_i CF_i DF_i / P``.
+    * ``modified_duration`` is the numeric ``-(1/P) dP/dz`` by central
+      difference of ``bump``.
+    * ``convexity`` is the numeric ``(1/P) d2P/dz2`` by central second
+      difference.
+    * ``dv01`` is :func:`dv01_from_curve`.
+
+    Because :func:`~tes_pricer.math.nss_model.nss_discount_factor` is
+    continuously compounded, ``dP/dz = -sum_i t_i CF_i DF_i`` exactly, and the
+    modified duration therefore **coincides with the Macaulay duration** up to
+    the ``O(bump^2)`` truncation of the finite difference. That is a property of
+    the basis, not a bug: the familiar ``D_mod = D_mac / (1 + y)`` is the
+    discrete-compounding form. The two are computed independently and reported
+    separately so a change of basis shows up as a divergence.
+
+    Raises:
+        ValueError: If ``params`` carries a non-positive decay constant, or the
+            bond has no remaining flows.
+    """
+    _validate_curve_params(params)
+    taus, flows = _curve_cashflows(terms, settlement_date)
+    factors = np.asarray(nss_discount_factor(taus, params), dtype=np.float64)
+    price = price_from_discount_factors(flows, factors)
+
+    weighted = flows * factors
+    macaulay = float(np.sum(taus * weighted) / price)
+
+    up = _curve_price(taus, flows, _shifted(params, bump))
+    down = _curve_price(taus, flows, _shifted(params, -bump))
+    modified = -(up - down) / (2.0 * bump * price)
+    convexity = (up + down - 2.0 * price) / (bump * bump * price)
+
+    return BondRisk(
+        dv01=price - up,
+        macaulay_duration=macaulay,
+        modified_duration=modified,
+        convexity=convexity,
+    )
 
 
 def key_rate_durations(
